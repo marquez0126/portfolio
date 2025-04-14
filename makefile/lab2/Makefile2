@@ -1,0 +1,4 @@
+CC=gcc
+CFLAGS=-I.
+hellomake:hellomake.c hellofunc.c hellomake.h
+	$(CC) -o hellomake hellomake.c hellofunc.c $(CFLAGS)

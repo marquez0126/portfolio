@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>整合控制介面</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      display: flex;
+      height: 100vh;
+    }
+    .left-panel, .right-panel {
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .left-panel {
+      flex: 3;
+      background-color: #fff;
+    }
+    .right-panel {
+      flex: 1;
+      background-color: #f9f9f9;
+      border-left: 1px solid #ccc;
+    }
+    .sensor-data {
+      background: #f0f0f0;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+    }
+		.ctrl {
+		font-size: 1.5rem; margin: 10px; padding: 10px 20px;	
+		}
+		.container {
+    display: flex;
+    justify-content: center;
+		}
+    button { margin: 4px; padding: 8px 12px; }
+    #photo { width: 100%; display: none; margin-top: 10px; border: 1px solid #ccc; }
+    #alert { font-size: 20px; font-weight: bold; display: none; }
+    #text { font-size: 18px; font-weight: bold; display: none; }
+    #status { color: green; font-weight: bold; }
+  </style>
+</head>
+<body>
+  
+	<div class="left-panel">
+    <h2>🕹️ Car Controller</h1>
+		<div class="container">
+    <button class="ctrl" onclick="sendCommand('F')">⬆️Forward</button><br>
+    </div>
+		<div class="container">
+    <button class="ctrl" onclick="sendCommand('L')">⬅️Left</button>
+    <button class="ctrl" onclick="sendCommand('S')">⏹️ Stop</button>
+    <button class="ctrl" onclick="sendCommand('R')">➡️Right</button><br>
+    </div>
+		<div class="container">
+    <button class="ctrl" onclick="sendCommand('B')">⬇️Backward</button>
+    </div>
+		<h1>🎤 語音 / 📸 拍照 / 🤖 馬達</h1>
+    <h2>🎤 語音辨識狀態</h2>
+    <p id="status">🟢 背景監聽中...</p>
+    <p id="alert"></p>
+    <p id="text"></p>
+
+    <h2>🤖 Servo Control</h2>
+    <button onclick="sendMove('up')">⬆️ Up</button>
+    <button onclick="sendMove('down')">⬇️ Down</button>
+    <button onclick="sendMove('left')">⬅️ Left</button>
+    <button onclick="sendMove('right')">➡️ Right</button>
+
+    <h2>📸 拍照設定</h2>
+    Width: <input type="number" id="width" value="1280" style="width:80px;">
+    Height: <input type="number" id="height" value="720" style="width:80px;">
+    <br><br>
+    <button onclick="captureWithLed()">📷 拍照（含亮燈）</button>
+    <img id="photo" src="">
+  </div>
+
+  <div class="right-panel">
+    <h2>🌡️ 環境感測資料</h2>
+    <div class="sensor-data">
+      <div><b>CO2:</b> <span id="co2">0</span> ppm</div>
+      <div><b>NH3:</b> <span id="nh3">0</span> ppm</div>
+      <div><b>Alcohol:</b> <span id="alcohol">0</span> ppm</div>
+      <div><b>CO:</b> <span id="co">0</span> ppm</div>
+      <div><b>溫度:</b> <span id="temperature">0</span> °C</div>
+      <div><b>濕度:</b> <span id="humidity">0</span> %</div>
+      <div><b>今日最高:</b> <span id="maxtemperature">0</span> °C</div>
+      <div><b>今日最低:</b> <span id="mintemperature">0</span> °C</div>
+    </div>
+
+    <!--<h3>查詢歷史資料</h3>
+    <button onclick="fetchHistory()">📜 全部資料</button>
+    <div id="history"></div>
+  -->
+    <h4>🔍 指定時間</h4>
+    <label>時: <input type="number" id="hour" min="0" max="23" /></label>
+    <label>分: <input type="number" id="minute" min="0" max="59" /></label>
+    <button onclick="fetchByTime()">查詢</button>
+    <div id="timeHistory"></div>
+  </div>
+
+  <script>
+    const host = location.hostname;
+    const wsVoice = new WebSocket(`ws://${host}:8081`);
+    const wsMove = new WebSocket(`ws://${host}:8082`);
+    const socket = io();
+
+    wsVoice.onmessage = (event) => {
+      const text = event.data.trim().toLowerCase();
+      document.getElementById("text").textContent = `🎤 辨識到: ${text}`;
+      document.getElementById("text").style.display = 'block';
+
+      if (text.includes("help")) showAlert("🚨 緊急狀況！", 'red');
+      else if (text.includes("hello")) showAlert("💡 已送出開燈指令！", 'green');
+      else if (text.includes("bye bye")) showAlert("💤 已送出關燈指令！", 'gray');
+    };
+
+    function showAlert(msg, color) {
+      const alert = document.getElementById("alert");
+      alert.textContent = msg;
+      alert.style.color = color;
+      alert.style.display = 'block';
+    }
+
+    function sendMove(dir) {
+      if (wsMove.readyState === WebSocket.OPEN) wsMove.send(`move ${dir}`);
+    }
+
+    function captureWithLed() {
+      const w = document.getElementById('width').value;
+      const h = document.getElementById('height').value;
+      fetch(`/led-on`, { method: "POST" })
+        .then(() => fetch(`/capture?width=${w}&height=${h}`))
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            const photo = document.getElementById('photo');
+            photo.src = `/uploads/${data.filename}?t=${Date.now()}`;
+            photo.style.display = 'block';
+          }
+        });
+    }
+
+    socket.on("sensorData", data => {
+      document.getElementById("co2").textContent = data.CO2 || 0;
+      document.getElementById("nh3").textContent = data.NH3 || 0;
+      document.getElementById("alcohol").textContent = data.Alcohol || 0;
+      document.getElementById("co").textContent = data.CO || 0;
+      document.getElementById("temperature").textContent = data.T || 0;
+      document.getElementById("humidity").textContent = data.H || 0;
+      document.getElementById("maxtemperature").textContent = data.maxTemp || 0;
+      document.getElementById("mintemperature").textContent = data.minTemp || 0;
+    });
+
+    function fetchHistory() {
+      fetch("/history").then(res => res.json()).then(data => {
+        document.getElementById("history").innerHTML = data.map(entry =>
+          `<div>${entry.timestamp} → CO2: ${entry.CO2} ppm, 溫度: ${entry.T}°C, 濕度: ${entry.H}%</div>`
+        ).join("");
+      });
+    }
+
+    function fetchByTime() {
+      const h = document.getElementById("hour").value;
+      const m = document.getElementById("minute").value;
+      fetch(`/history/${h}/${m}`).then(res => res.json()).then(data => {
+        document.getElementById("timeHistory").innerHTML = data.map(entry =>
+          `<div>${entry.timestamp} → CO2: ${entry.CO2} ppm, 溫度: ${entry.T}°C</div>`
+        ).join("");
+      });
+    }
+		function sendCommand(cmd) {
+        fetch('/control', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ command: cmd })
+        }).then(res => {
+          if (!res.ok) throw new Error('Failed');
+          console.log("Command sent:", cmd);
+        }).catch(err => {
+          alert("Failed to send command");
+          console.error(err);
+        });
+      }
+  </script>
+</body>
+</html>

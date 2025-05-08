@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Raspberry Pi 馬達控制</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      margin-top: 50px;
+    }
+    button {
+      font-size: 20px;
+      padding: 10px 20px;
+      margin: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>馬達 Wi-Fi 控制面板</h1>
+
+  <button onclick="sendCommand('F')">前進</button><br>
+  <button onclick="sendCommand('L')">左轉</button>
+  <button onclick="sendCommand('S')">停止</button>
+  <button onclick="sendCommand('R')">右轉</button><br>
+  <button onclick="sendCommand('B')">後退</button>
+
+  <script>
+    function sendCommand(cmd) {
+      fetch(`/${cmd}`)
+        .then(res => res.text())
+        .then(msg => console.log(msg))
+        .catch(err => alert('無法連線到伺服器'));
+    }
+  </script>
+</body>
+</html>
+

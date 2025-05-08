@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Car Controller</title>
+  <style>
+    body { text-align: center; font-family: sans-serif; margin-top: 40px; }
+    button { font-size: 1.5rem; margin: 10px; padding: 10px 20px; }
+  </style>
+</head>
+<body>
+  <h1>🕹️ Raspberry Pi Car Controller</h1>
+  <button onclick="sendCommand('F')">⬆️ Forward</button><br>
+  <button onclick="sendCommand('L')">⬅️ Left</button>
+  <button onclick="sendCommand('S')">⏹️ Stop</button>
+  <button onclick="sendCommand('R')">➡️ Right</button><br>
+  <button onclick="sendCommand('B')">⬇️ Backward</button>
+
+  <script>
+    function sendCommand(cmd) {
+      fetch('/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: cmd })
+      }).then(res => {
+        if (!res.ok) throw new Error('Failed');
+        console.log("Command sent:", cmd);
+      }).catch(err => {
+        alert("Failed to send command");
+        console.error(err);
+      });
+    }
+  </script>
+</body>
+</html>
+
+
